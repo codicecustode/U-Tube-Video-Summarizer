@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>YouTube Summarizer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background-color: #f9f9f9;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    input[type="text"] {
+      width: 60%;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+
+    #output {
+      margin-top: 30px;
+      padding: 15px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>YouTube Summarizer</h1>
+
+  <input type="text" id="youtubeUrl" placeholder="Paste YouTube link here" />
+  <button onclick="sendUrl()">Send</button>
+
+  <div id="output"></div>
+
+  <script>
+    function extractVideoId(url) {
+      const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/);
+      return match ? match[1] : null;
+    }
+
+    async function sendUrl() {
+      const url = document.getElementById('youtubeUrl').value;
+      const videoId = extractVideoId(url);
+
+      if (!videoId) {
+        document.getElementById('output').innerText = "Invalid YouTube link!";
+        return;
+      }
+
+      try {
+        console.log("Extracted Video ID:", videoId);
+
+        const response = await fetch('/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_id: videoId })
+        });
+        const data = await response.json();
+        console.log("Extracted Data:", data);
+        document.getElementById('output').innerText = data.summarize_transcript || "No summary received.";
+      } catch (error) {
+        console.error("Error:", error);
+      }
+
+      
+
+
+    }
+  </script>
+</body>
+
+</html>
