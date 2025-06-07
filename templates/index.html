@@ -6,46 +6,131 @@
   <title>YouTube Summarizer</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 40px;
-      background-color: #f9f9f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      height: 100vh;
+      background-color: #f4f6f8;
+      color: #2c3e50;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
-    h1 {
-      color: #333;
+    .container {
+      text-align: center;
+      width: 80%;
+      max-width: 600px;
     }
 
-    input[type="text"] {
-      width: 60%;
-      padding: 10px;
+    .moving-text {
+      font-size: 28px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 30px;
+      white-space: nowrap;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .moving-text span {
+      display: inline-block;
+      padding-left: 100%;
+      animation: scroll-left 10s linear infinite;
+    }
+
+    @keyframes scroll-left {
+      0% {
+        transform: translateX(0%);
+      }
+
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 12px 15px;
       font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      outline: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: #3498db;
+      box-shadow: 0 0 8px rgba(52, 152, 219, 0.3);
     }
 
     button {
-      padding: 10px 20px;
+      padding: 12px 24px;
       font-size: 16px;
-      margin-left: 10px;
+      margin-top: 10px;
       cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background-color: #3498db;
+      color: white;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+      transform: translateY(-2px);
     }
 
     #output {
       margin-top: 30px;
-      padding: 15px;
-      background: #fff;
+      padding: 20px;
+      background: #ffffff;
       border: 1px solid #ddd;
-      border-radius: 5px;
+      border-radius: 10px;
       white-space: pre-wrap;
+      opacity: 0;
+      transform: translateY(10px);
+      animation: fadeInUp 0.6s ease forwards;
+      animation-delay: 0.4s;
+    }
+
+    @keyframes fadeInUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
   </style>
 </head>
 
 <body>
-  <h1>YouTube Summarizer</h1>
+  <div class="container">
+    <div class="moving-text">
+      <span>🎥 Welcome to the YouTube Summarizer – Select Your Model and Paste a Link!</span>
+    </div>
 
-  <input type="text" id="youtubeUrl" placeholder="Paste YouTube link here" />
-  <button onclick="sendUrl()">Send</button>
+    <input type="text" id="youtubeUrl" placeholder="Paste YouTube link here" />
+    <br>
 
-  <div id="output"></div>
+    <select id="modelSelector">
+      <option value="bart">BART</option>
+      <option value="t5">T5</option>
+      <option value="pegasus">Pegasus</option>
+      <option value="mbart">mBART (Multilingual)</option>
+      <option value="textrank">TextRank (Extractive)</option>
+      <option value="gpt">GPT (OpenAI)</option>
+      <option value="gemini">Gemini (Google)</option>
+      <option value="deepseek">DeepSeek</option>
+    </select>
+
+    <br>
+    <button onclick="sendUrl()">Summarize</button>
+
+    <div id="output"></div>
+  </div>
 
   <script>
     function extractVideoId(url) {
@@ -55,6 +140,7 @@
 
     async function sendUrl() {
       const url = document.getElementById('youtubeUrl').value;
+      const model = document.getElementById('modelSelector').value;
       const videoId = extractVideoId(url);
 
       if (!videoId) {
@@ -63,23 +149,18 @@
       }
 
       try {
-        console.log("Extracted Video ID:", videoId);
-
         const response = await fetch('/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ video_id: videoId })
+          body: JSON.stringify({ video_id: videoId, model: model })
         });
+
         const data = await response.json();
-        console.log("Extracted Data:", data);
         document.getElementById('output').innerText = data.summarize_transcript || "No summary received.";
       } catch (error) {
         console.error("Error:", error);
+        document.getElementById('output').innerText = "Error occurred while summarizing.";
       }
-
-      
-
-
     }
   </script>
 </body>
