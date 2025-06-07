@@ -103,6 +103,36 @@
         transform: translateY(0);
       }
     }
+
+    #loader {
+      display: none;
+      margin-top: 20px;
+      font-weight: bold;
+      color: #3498db;
+      font-size: 18px;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
   </style>
 </head>
 
@@ -116,18 +146,17 @@
     <br>
 
     <select id="modelSelector">
-      <option value="bart">BART</option>
-      <option value="t5">T5</option>
-      <option value="pegasus">Pegasus</option>
-      <option value="mbart">mBART (Multilingual)</option>
-      <option value="textrank">TextRank (Extractive)</option>
-      <option value="gpt">GPT (OpenAI)</option>
-      <option value="gemini">Gemini (Google)</option>
-      <option value="deepseek">DeepSeek</option>
+      <option value="bart">Gemini</option>
+      <option value="t5">GPT</option>
+      <option value="deepseek">Deepseek(Coming Soon)</option>
     </select>
 
     <br>
     <button onclick="sendUrl()">Summarize</button>
+
+    <div id="loader">
+      <div class="spinner"></div>Summarizing...
+    </div>
 
     <div id="output"></div>
   </div>
@@ -143,10 +172,17 @@
       const model = document.getElementById('modelSelector').value;
       const videoId = extractVideoId(url);
 
+      const outputDiv = document.getElementById('output');
+      const loaderDiv = document.getElementById('loader');
+
       if (!videoId) {
-        document.getElementById('output').innerText = "Invalid YouTube link!";
+        outputDiv.innerText = "Invalid YouTube link!";
         return;
       }
+
+      outputDiv.innerText = "";
+      outputDiv.style.opacity = 0;
+      loaderDiv.style.display = "block";
 
       try {
         const response = await fetch('/summarize', {
@@ -156,10 +192,14 @@
         });
 
         const data = await response.json();
-        document.getElementById('output').innerText = data.summarize_transcript || "No summary received.";
+        loaderDiv.style.display = "none";
+        outputDiv.innerText = data.summarize_transcript || "No summary received.";
+        outputDiv.style.opacity = 1;
       } catch (error) {
+        loaderDiv.style.display = "none";
         console.error("Error:", error);
-        document.getElementById('output').innerText = "Error occurred while summarizing.";
+        outputDiv.innerText = "Error occurred while summarizing.";
+        outputDiv.style.opacity = 1;
       }
     }
   </script>
