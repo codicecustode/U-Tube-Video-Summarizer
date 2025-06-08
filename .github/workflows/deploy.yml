@@ -21,7 +21,9 @@ jobs:
       - name: Deploy to GCP VM
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_IP }} << 'EOF'
-            cd my-fastapi-app
-            git pull origin main
-            uvicorn main:app
+            cd ~/my-fastapi-app
+            git fetch origin main
+            git reset --hard origin/main
+            source venv/bin/activate 
+            nohup uvicorn main:app --host 0.0.0.0 --port 8000
           EOF
