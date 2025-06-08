@@ -27,6 +27,6 @@ jobs:
             source venv/bin/activate
             export GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
             pip install -r requirements.txt
-            nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+            uvicorn main:app --host 0.0.0.0 --port 8000 &
           EOF
 
