@@ -36,4 +36,4 @@ def youtube_video(video_request: VideoRequest):
 
     except Exception as e:
         print(f"An error occurred while fetching the transcript: {e}")
-        return {"error": "An error occurred while fetching the transcript."}
+        return {"error": "An error occurred while fetching the transcript. Try again later"}
