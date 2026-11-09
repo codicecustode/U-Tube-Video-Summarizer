@@ -26,6 +26,8 @@ jobs:
             git reset --hard origin/main
             source venv/bin/activate
             export GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
+            export GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}"
+            export NVIDIA_API_KEY="${{ secrets.NVIDIA_API_KEY }}"
             pip install -r requirements.txt
             uvicorn main:app --host 0.0.0.0 --port 8000 &
           EOF
