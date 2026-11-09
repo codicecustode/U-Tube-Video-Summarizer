@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from utils.transcript_generate import get_transcript
 from utils.gemini_summarizer import summarize_text_gemini
 
-import torch
 
 app = FastAPI()
 
@@ -16,7 +15,6 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 def root_page(request: Request):
-    print("gpu available: ", torch.cuda.is_available())
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/summarize")
