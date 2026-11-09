@@ -104,6 +104,12 @@
       }
     }
 
+    .hint {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #7f8c8d;
+    }
+
     #loader {
       display: none;
       margin-top: 20px;
@@ -139,17 +145,18 @@
 <body>
   <div class="container">
     <div class="moving-text">
-      <span>🎥 Welcome to the YouTube Summarizer, Summarize ur youtube video – Select Your Model and Paste a Link!</span>
+      <span>🎥 Welcome to the YouTube Summarizer, Summarize your YouTube video – pick a model and paste a link!</span>
     </div>
 
     <input type="text" id="youtubeUrl" placeholder="Paste YouTube link here" />
     <br>
 
-    <select id="modelSelector">
-      <option value="bart">Gemini</option>
-      <option value="t5">GPT</option>
-      <option value="deepseek">Deepseek(Coming Soon)</option>
+    <select id="providerSelector" aria-label="AI provider" onchange="fillModels()">
+      <option>Loading providers...</option>
     </select>
+
+    <select id="modelSelector" aria-label="Model"></select>
+    <p id="modelHint" class="hint"></p>
 
     <br>
     <button onclick="sendUrl()">Summarize</button>
@@ -162,6 +169,50 @@
   </div>
 
   <script>
+    let providers = [];
+
+    async function loadModels() {
+      const providerSelect = document.getElementById('providerSelector');
+      const hint = document.getElementById('modelHint');
+      try {
+        const response = await fetch('/api/models');
+        const data = await response.json();
+        providers = data.providers;
+
+        providerSelect.innerHTML = '';
+        for (const provider of providers) {
+          const label = provider.available ? provider.label : `${provider.label} (API key not set)`;
+          const option = new Option(label, provider.id);
+          option.disabled = !provider.available;
+          providerSelect.add(option);
+        }
+
+        if (data.default) {
+          providerSelect.value = data.default.provider;
+          fillModels(data.default.model);
+          hint.innerText = '';
+        } else {
+          fillModels();
+          hint.innerText = 'No API keys are set yet. Add them to .env and restart the server.';
+        }
+      } catch (error) {
+        console.error('Could not load models:', error);
+        hint.innerText = 'Could not load the model list.';
+      }
+    }
+
+    function fillModels(selectedModel) {
+      const providerId = document.getElementById('providerSelector').value;
+      const modelSelect = document.getElementById('modelSelector');
+      const provider = providers.find(p => p.id === providerId);
+
+      modelSelect.innerHTML = '';
+      for (const model of (provider ? provider.models : [])) {
+        modelSelect.add(new Option(model.label, model.id));
+      }
+      if (selectedModel) modelSelect.value = selectedModel;
+    }
+
     function extractVideoId(url) {
       const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/);
       return match ? match[1] : null;
@@ -169,6 +220,7 @@
 
     async function sendUrl() {
       const url = document.getElementById('youtubeUrl').value;
+      const provider = document.getElementById('providerSelector').value;
       const model = document.getElementById('modelSelector').value;
       const videoId = extractVideoId(url);
 
@@ -188,12 +240,17 @@
         const response = await fetch('/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ video_id: videoId, model: model })
+          body: JSON.stringify({ video_id: videoId, provider: provider, model: model })
         });
 
         const data = await response.json();
         loaderDiv.style.display = "none";
-        outputDiv.innerText = data.summarize_transcript || "No summary received.";
+        if (!response.ok || data.error) {
+          outputDiv.innerText = data.error || "Error occurred while summarizing.";
+        } else {
+          const note = data.truncated ? "Note: this video is long, so the summary covers only the first part of it.\n\n" : "";
+          outputDiv.innerText = note + (data.summarize_transcript || "No summary received.");
+        }
         outputDiv.style.opacity = 1;
       } catch (error) {
         loaderDiv.style.display = "none";
@@ -202,6 +259,8 @@
         outputDiv.style.opacity = 1;
       }
     }
+
+    loadModels();
   </script>
 </body>
 
