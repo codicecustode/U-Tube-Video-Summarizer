@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator
 
-from utils.llm_providers import LLMError, check_choice, default_choice, list_models, summarize
+from utils.llm_providers import LLMError, check_choice, default_choice, list_models, async_summarize
 from utils.transcript_generate import get_transcript
 
 load_dotenv()
@@ -86,7 +86,7 @@ async def youtube_video(video_request: VideoRequest):
         )
 
     try:
-        summary, truncated = summarize(provider, model, transcript)
+        summary, truncated = await async_summarize(provider, model, transcript)
     except LLMError as error:
         return JSONResponse({"error": str(error)}, status_code=error.status)
 
