@@ -4,11 +4,14 @@ Every provider below accepts the OpenAI chat-completions format, so one client
 works for all of them: only the base URL, the API key and the model name change.
 A provider becomes available as soon as its API key is set in the environment.
 """
+import logging
 import os
 import re
 
 import openai
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 PROVIDERS = {
     "gemini": {
@@ -25,7 +28,6 @@ PROVIDERS = {
         "label": "Groq",
         "base_url": "https://api.groq.com/openai/v1",
         "key_env": "GROQ_API_KEY",
-        # Groq's free plan allows about 8K tokens per minute, so long transcripts are shortened
         "max_input_chars": 20_000,
         "models": {
             "openai/gpt-oss-20b": "GPT-OSS 20B",
@@ -54,13 +56,27 @@ PROMPT = (
     "- Use only the most important insights, facts, or key takeaways\n"
     "- Start each bullet with a fitting emoji like 💡 (idea), 🎯 (key point), 📌 (fact), or 🚀 (tip) based on the content\n"
     "- Add one blank line between each bullet point for better readability\n"
-    "- Use simple, clear language that’s easy to scan and understand\n"
+    "- Use simple, clear language that's easy to scan and understand\n"
     "- Do NOT include unimportant information, repetition, or long paragraphs\n\n"
     "Here is the YouTube video transcript:\n\n"
 )
 
-# Some reasoning models put their thinking inside <think> tags in the reply
 THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+# Reuse one client per provider instead of creating a new one every request
+_clients: dict[str, OpenAI] = {}
+
+
+def _get_client(provider: str) -> OpenAI:
+    if provider not in _clients:
+        config = PROVIDERS[provider]
+        _clients[provider] = OpenAI(
+            base_url=config["base_url"],
+            api_key=_api_key(provider),
+            timeout=120,
+            max_retries=1,
+        )
+    return _clients[provider]
 
 
 class LLMError(Exception):
@@ -119,7 +135,7 @@ def summarize(provider: str, model: str, transcript: str) -> tuple[str, bool]:
     if truncated:
         transcript = transcript[: config["max_input_chars"]]
 
-    client = OpenAI(base_url=config["base_url"], api_key=_api_key(provider), timeout=120, max_retries=1)
+    client = _get_client(provider)
     try:
         response = client.chat.completions.create(
             model=model,
