@@ -2,6 +2,6 @@ fastapi
 uvicorn
 jinja2
 pydantic
-youtube-transcript-api
+yt-dlp
 openai
 python-dotenv
