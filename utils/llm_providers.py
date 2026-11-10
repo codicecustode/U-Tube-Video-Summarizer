@@ -3,10 +3,14 @@
 Every provider below accepts the OpenAI chat-completions format, so one client
 works for all of them: only the base URL, the API key and the model name change.
 A provider becomes available as soon as its API key is set in the environment.
+
+Long transcripts are split into chunks, summarized in parallel, then combined.
 """
+import asyncio
 import logging
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 
 import openai
 from openai import OpenAI
@@ -50,6 +54,10 @@ PROVIDERS = {
 
 DEFAULT_CHOICE = ("gemini", "gemini-2.5-flash")
 
+# ── Chunk size for splitting long transcripts ─────────────────────────────────
+# Each chunk gets its own summarize call; all chunks run in parallel.
+CHUNK_SIZE = 15_000  # chars per chunk (safe for all providers)
+
 PROMPT = (
     "You are an intelligent summarizer. Given a YouTube video transcript, generate a clear, visually appealing summary in bullet points format.\n\n"
     "Requirements:\n"
@@ -61,10 +69,30 @@ PROMPT = (
     "Here is the YouTube video transcript:\n\n"
 )
 
+CHUNK_PROMPT = (
+    "You are an intelligent summarizer. This is PART {part_num} of {total_parts} of a YouTube video transcript. "
+    "Summarize only the key points from this part in bullet points. "
+    "Start each bullet with a fitting emoji. Be concise.\n\n"
+    "Transcript part:\n\n"
+)
+
+COMBINE_PROMPT = (
+    "Below are summaries of different parts of the same YouTube video. "
+    "Combine them into one final, coherent summary.\n\n"
+    "Requirements:\n"
+    "- Merge duplicate or overlapping points\n"
+    "- Keep the most important insights from all parts\n"
+    "- Start each bullet with a fitting emoji\n"
+    "- Add one blank line between each bullet point\n"
+    "- The final summary should read as one unified document, not separate parts\n\n"
+    "Part summaries:\n\n"
+)
+
 THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
-# Reuse one client per provider instead of creating a new one every request
+# Reuse one client per provider
 _clients: dict[str, OpenAI] = {}
+_executor = ThreadPoolExecutor(max_workers=6)
 
 
 def _get_client(provider: str) -> OpenAI:
@@ -115,7 +143,7 @@ def default_choice() -> tuple[str, str] | None:
 
 
 def check_choice(provider: str, model: str) -> None:
-    """Rejects providers and models that aren't configured here, so the API keys can't be used for anything else."""
+    """Rejects providers and models that aren't configured here."""
     if provider not in PROVIDERS:
         raise LLMError(f"Unknown provider: {provider}", 400)
     if model not in PROVIDERS[provider]["models"]:
@@ -125,21 +153,16 @@ def check_choice(provider: str, model: str) -> None:
         raise LLMError(f"{PROVIDERS[provider]['label']} isn't set up yet: add {key_env} to your environment and restart.", 503)
 
 
-def summarize(provider: str, model: str, transcript: str) -> tuple[str, bool]:
-    """Summarizes a transcript with the chosen model. Returns the summary and whether the transcript was shortened."""
-    check_choice(provider, model)
+def _call_llm(provider: str, model: str, prompt: str) -> str:
+    """Single LLM call. Returns the cleaned response text."""
     config = PROVIDERS[provider]
     model_label = config["models"][model]
-
-    truncated = len(transcript) > config["max_input_chars"]
-    if truncated:
-        transcript = transcript[: config["max_input_chars"]]
-
     client = _get_client(provider)
+
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": PROMPT + transcript}],
+            messages=[{"role": "user", "content": prompt}],
         )
     except openai.RateLimitError:
         raise LLMError(f"{model_label} has reached its free usage limit for now. Pick another model or try again in a minute.", 429)
@@ -154,7 +177,78 @@ def summarize(provider: str, model: str, transcript: str) -> tuple[str, bool]:
             raise LLMError(f"This video is too long for {model_label}'s free limit. Try a Gemini model.", 413)
         raise LLMError(f"{config['label']} returned an error ({error.status_code}). Try another model.", 502)
 
-    summary = THINK_BLOCK.sub("", response.choices[0].message.content or "").strip()
-    if not summary:
+    text = THINK_BLOCK.sub("", response.choices[0].message.content or "").strip()
+    if not text:
         raise LLMError(f"{model_label} returned an empty reply. Try another model.", 502)
-    return summary, truncated
+    return text
+
+
+def _split_transcript(transcript: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
+    """Split transcript into chunks, breaking at sentence boundaries where possible."""
+    if len(transcript) <= chunk_size:
+        return [transcript]
+
+    chunks = []
+    start = 0
+    while start < len(transcript):
+        end = start + chunk_size
+        if end >= len(transcript):
+            chunks.append(transcript[start:])
+            break
+        # Try to break at a sentence boundary (. ! ? followed by space)
+        break_point = transcript.rfind(". ", start + chunk_size - 2000, end)
+        if break_point == -1:
+            break_point = transcript.rfind(" ", start + chunk_size - 500, end)
+        if break_point == -1:
+            break_point = end
+        else:
+            break_point += 1  # include the period/space
+        chunks.append(transcript[start:break_point])
+        start = break_point
+
+    return chunks
+
+
+def summarize(provider: str, model: str, transcript: str) -> tuple[str, bool]:
+    """Summarizes a transcript. Short ones go direct, long ones are chunked in parallel."""
+    check_choice(provider, model)
+
+    # Short transcript: single call (same as before)
+    if len(transcript) <= CHUNK_SIZE:
+        logger.info("Short transcript (%d chars), single call", len(transcript))
+        summary = _call_llm(provider, model, PROMPT + transcript)
+        return summary, False
+
+    # Long transcript: chunk → parallel summarize → combine
+    chunks = _split_transcript(transcript)
+    logger.info("Long transcript (%d chars), split into %d chunks", len(transcript), len(chunks))
+
+    # Summarize each chunk (runs in thread pool for true parallelism with sync OpenAI client)
+    def summarize_chunk(i: int, chunk: str) -> str:
+        prompt = CHUNK_PROMPT.format(part_num=i + 1, total_parts=len(chunks)) + chunk
+        return _call_llm(provider, model, prompt)
+
+    loop = asyncio.new_event_loop()
+    try:
+        futures = [
+            loop.run_in_executor(_executor, summarize_chunk, i, chunk)
+            for i, chunk in enumerate(chunks)
+        ]
+        chunk_summaries = loop.run_until_complete(asyncio.gather(*futures))
+    finally:
+        loop.close()
+
+    logger.info("All %d chunks summarized, combining", len(chunks))
+
+    # Combine all chunk summaries into one final summary
+    combined_input = ""
+    for i, cs in enumerate(chunk_summaries):
+        combined_input += f"--- Part {i + 1} of {len(chunks)} ---\n{cs}\n\n"
+
+    final_summary = _call_llm(provider, model, COMBINE_PROMPT + combined_input)
+    return final_summary, False
+
+
+async def async_summarize(provider: str, model: str, transcript: str) -> tuple[str, bool]:
+    """Async wrapper for use in FastAPI async routes."""
+    return await asyncio.to_thread(summarize, provider, model, transcript)
