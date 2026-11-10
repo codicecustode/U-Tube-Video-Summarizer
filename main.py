@@ -56,6 +56,11 @@ async def models():
     }
 
 
+@app.get("/api/health")
+async def health():
+    return {"status": "healthy"}
+
+
 @app.post("/summarize")
 async def youtube_video(video_request: VideoRequest):
     provider, model = video_request.provider, video_request.model
@@ -73,20 +78,27 @@ async def youtube_video(video_request: VideoRequest):
     except LLMError as error:
         return JSONResponse({"error": str(error)}, status_code=error.status)
 
-    transcript = get_transcript(video_request.video_id)
+    transcript, method = get_transcript(video_request.video_id)
     if transcript is None:
-        return JSONResponse({"error": "Could not fetch the transcript. The video may not have captions enabled."}, status_code=404)
+        return JSONResponse(
+            {"error": "Could not extract transcript. The video may be private, region-locked, or have no spoken content."},
+            status_code=404,
+        )
 
     try:
         summary, truncated = summarize(provider, model, transcript)
     except LLMError as error:
         return JSONResponse({"error": str(error)}, status_code=error.status)
 
-    logger.info("Summarized %s with %s/%s (%d chars transcript)", video_request.video_id, provider, model, len(transcript))
+    logger.info(
+        "Summarized %s with %s/%s via %s (%d chars transcript)",
+        video_request.video_id, provider, model, method, len(transcript),
+    )
     return {
         "video_id": video_request.video_id,
         "provider": provider,
         "model": model,
+        "method": method,
         "truncated": truncated,
         "summary": summary,
     }
