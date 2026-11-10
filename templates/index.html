@@ -459,6 +459,7 @@ $('summarizeBtn').addEventListener('click', async () => {
       $('metaRow').style.display = 'flex';
       $('metaProvider').textContent = (data.provider || '') + ' / ' + (data.model || '');
       $('metaTime').textContent = elapsed + 's';
+      if (data.method) { const mt = document.createElement('span'); mt.className='meta-tag'; mt.textContent = data.method === 'whisper' ? 'Audio transcribed' : 'Subtitles'; $('metaRow').appendChild(mt); }
       stopProgress(true);
     }
   } catch (err) {
