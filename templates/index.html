@@ -1,377 +1,497 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YouTube Summarizer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Video Summarizer</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f0f0f;
+      color: #e1e1e1;
       min-height: 100vh;
-      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-      color: #e0e0e0;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border-bottom: 1px solid #ffffff12;
+      padding: 1rem 2rem;
       display: flex;
-      justify-content: center;
       align-items: center;
-      padding: 20px;
+      gap: 0.75rem;
     }
+    header svg { width: 32px; height: 32px; flex-shrink: 0; }
+    header h1 { font-size: 1.25rem; font-weight: 600; color: #fff; }
 
+    /* ── Main layout ── */
     .container {
-      width: 100%;
-      max-width: 640px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      min-height: calc(100vh - 64px);
     }
 
-    h1 {
-      font-size: 1.8rem;
-      text-align: center;
-      margin-bottom: 8px;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    /* ── Panels ── */
+    .panel {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
     }
-
-    .subtitle {
-      text-align: center;
-      color: #9a9ab0;
-      font-size: 0.95rem;
-      margin-bottom: 28px;
-    }
-
-    .card {
-      background: rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 28px 24px;
-    }
-
-    label {
-      display: block;
-      font-size: 0.8rem;
+    .panel-title {
+      font-size: 0.75rem;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #9a9ab0;
-      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 1rem;
     }
 
-    input[type="text"], select {
+    /* ── Input section ── */
+    .url-input-wrap {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    .url-input-wrap input {
       width: 100%;
-      padding: 12px 14px;
-      font-size: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.05);
-      color: #e0e0e0;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #fff;
+      font-size: 0.95rem;
       outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      margin-bottom: 16px;
+      transition: border-color 0.2s;
     }
+    .url-input-wrap input:focus { border-color: #ff4444; }
+    .url-input-wrap input::placeholder { color: #555; }
 
-    input:focus, select:focus {
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
-    }
-
-    select option { background: #1e1e2f; color: #e0e0e0; }
-
-    .row { display: flex; gap: 12px; }
-    .row > * { flex: 1; min-width: 0; }
-
-    button {
+    /* ── Thumbnail ── */
+    .thumbnail-wrap {
       width: 100%;
-      padding: 14px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #111;
+      aspect-ratio: 16/9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    .thumbnail-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .thumbnail-placeholder {
+      color: #444;
+      font-size: 0.9rem;
+    }
+
+    /* ── Dropdowns row ── */
+    .selectors {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .select-group label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #666;
+      margin-bottom: 0.35rem;
+    }
+    .select-group select {
+      width: 100%;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      color: #fff;
+      font-size: 0.85rem;
+      cursor: pointer;
+      outline: none;
+    }
+    .select-group select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Button ── */
+    .btn {
+      width: 100%;
+      padding: 0.85rem;
+      border: none;
+      border-radius: 8px;
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      transition: opacity 0.2s, transform 0.15s;
-      margin-top: 4px;
+      transition: all 0.2s;
+      background: #ff4444;
+      color: #fff;
     }
+    .btn:hover:not(:disabled) { background: #e03333; transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-    button:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .hint {
+    /* ── Progress bar ── */
+    .progress-wrap {
+      margin-top: 1rem;
+      display: none;
+    }
+    .progress-wrap.active { display: block; }
+    .progress-label {
       font-size: 0.8rem;
-      color: #9a9ab0;
-      margin: -8px 0 12px;
+      color: #888;
+      margin-bottom: 0.4rem;
+      display: flex;
+      justify-content: space-between;
     }
-
-    /* Thumbnail preview */
-    .thumbnail {
-      display: none;
-      margin: 0 0 16px;
-      border-radius: 10px;
-      overflow: hidden;
-      position: relative;
-    }
-    .thumbnail img {
+    .progress-bar {
       width: 100%;
-      display: block;
-      border-radius: 10px;
+      height: 4px;
+      background: #222;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff4444, #ff6b6b);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.3s ease;
     }
 
-    /* Output */
-    .output-section {
-      margin-top: 24px;
-      display: none;
+    /* ── Right panel: Summary ── */
+    .summary-panel {
+      display: flex;
+      flex-direction: column;
     }
-
-    .output-section.visible { display: block; }
-
-    .output-header {
+    .summary-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
+      margin-bottom: 1rem;
     }
-
-    .output-header h2 { font-size: 1rem; color: #b0b0c8; }
-
     .copy-btn {
-      width: auto;
-      padding: 6px 14px;
-      font-size: 0.8rem;
-      margin: 0;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-    }
-    .copy-btn:hover { background: rgba(255, 255, 255, 0.14); }
-
-    .output-body {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: 20px;
-      line-height: 1.7;
-      white-space: pre-wrap;
-      font-size: 0.95rem;
-      max-height: 500px;
-      overflow-y: auto;
-    }
-
-    .output-body.error { color: #f87171; border-color: rgba(248, 113, 113, 0.2); }
-
-    .meta {
-      margin-top: 10px;
+      background: #222;
+      border: 1px solid #333;
+      color: #aaa;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
       font-size: 0.75rem;
-      color: #6a6a80;
-      text-align: right;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: #333; color: #fff; }
+
+    .summary-content {
+      flex: 1;
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow-y: auto;
+      line-height: 1.7;
+      font-size: 0.9rem;
+      min-height: 300px;
+    }
+    .summary-content.empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #444;
+      font-style: italic;
+    }
+    .summary-content.error { color: #ff6b6b; }
+
+    .meta-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .meta-tag {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.6rem;
+      background: #1e1e1e;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #888;
     }
 
-    .loader {
-      display: none;
-      text-align: center;
-      margin-top: 24px;
-      color: #667eea;
-      font-size: 0.95rem;
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+      }
+      header { padding: 0.75rem 1rem; }
+      header h1 { font-size: 1.1rem; }
     }
-    .loader.active { display: block; }
-
-    .spinner {
-      border: 3px solid rgba(255, 255, 255, 0.08);
-      border-top: 3px solid #667eea;
-      border-radius: 50%;
-      width: 22px; height: 22px;
-      animation: spin 0.8s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
-      margin-right: 10px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    @media (max-width: 500px) {
-      .row { flex-direction: column; gap: 0; }
-      h1 { font-size: 1.4rem; }
-      .card { padding: 20px 16px; }
+    @media (max-width: 480px) {
+      .selectors { grid-template-columns: 1fr; }
+      .summary-content { min-height: 200px; }
     }
   </style>
 </head>
-
 <body>
-  <div class="container">
-    <h1>YouTube Video Summarizer</h1>
-    <p class="subtitle">Pick a model, paste a link, get the key points</p>
 
-    <div class="card">
-      <label for="youtubeUrl">YouTube link</label>
-      <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." autofocus />
+<header>
+  <svg viewBox="0 0 24 24" fill="none" stroke="#ff4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="5 3 19 12 5 21 5 3"/>
+  </svg>
+  <h1>YouTube Video Summarizer</h1>
+</header>
 
-      <div class="thumbnail" id="thumbnail">
-        <img id="thumbImg" alt="Video thumbnail" />
-      </div>
+<div class="container">
+  <!-- LEFT: Input panel -->
+  <div class="panel">
+    <div class="panel-title">Video Input</div>
 
-      <div class="row">
-        <div>
-          <label for="providerSelector">Provider</label>
-          <select id="providerSelector" onchange="fillModels()">
-            <option>Loading...</option>
-          </select>
-        </div>
-        <div>
-          <label for="modelSelector">Model</label>
-          <select id="modelSelector"></select>
-        </div>
-      </div>
-      <p id="modelHint" class="hint"></p>
-
-      <button id="summarizeBtn" onclick="sendUrl()">Summarize</button>
+    <div class="url-input-wrap">
+      <input type="text" id="videoUrl" placeholder="Paste YouTube URL or video ID..." autocomplete="off">
     </div>
 
-    <div class="loader" id="loader">
-      <div class="spinner"></div>Summarizing with <span id="loaderModel"></span>...
+    <div class="thumbnail-wrap" id="thumbWrap">
+      <img id="thumbImg" alt="Video thumbnail">
+      <span class="thumbnail-placeholder" id="thumbPlaceholder">Paste a URL to see the thumbnail</span>
     </div>
 
-    <div class="output-section" id="outputSection">
-      <div class="output-header">
-        <h2>Summary</h2>
-        <button class="copy-btn" onclick="copySummary()">Copy</button>
+    <div class="selectors">
+      <div class="select-group">
+        <label>Provider</label>
+        <select id="providerSelect" disabled><option>Loading...</option></select>
       </div>
-      <div class="output-body" id="output"></div>
-      <div class="meta" id="meta"></div>
+      <div class="select-group">
+        <label>Model</label>
+        <select id="modelSelect" disabled><option>Loading...</option></select>
+      </div>
+    </div>
+
+    <button class="btn" id="summarizeBtn" disabled>Summarize</button>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span id="progressText">Fetching transcript...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
     </div>
   </div>
 
-  <script>
-    let providers = [];
+  <!-- RIGHT: Summary panel -->
+  <div class="panel summary-panel">
+    <div class="summary-header">
+      <div class="panel-title" style="margin-bottom:0">Summary</div>
+      <button class="copy-btn" id="copyBtn" style="display:none">Copy</button>
+    </div>
 
-    async function loadModels() {
-      const providerSelect = document.getElementById('providerSelector');
-      const hint = document.getElementById('modelHint');
-      try {
-        const res = await fetch('/api/models');
-        const data = await res.json();
-        providers = data.providers;
+    <div class="summary-content empty" id="summaryBox">
+      Enter a YouTube URL and click Summarize
+    </div>
 
-        providerSelect.innerHTML = '';
-        for (const p of providers) {
-          const label = p.available ? p.label : `${p.label} (no key)`;
-          const opt = new Option(label, p.id);
-          opt.disabled = !p.available;
-          providerSelect.add(opt);
-        }
+    <div class="meta-row" id="metaRow" style="display:none">
+      <span class="meta-tag" id="metaProvider"></span>
+      <span class="meta-tag" id="metaTime"></span>
+    </div>
+  </div>
+</div>
 
-        if (data.default) {
-          providerSelect.value = data.default.provider;
-          fillModels(data.default.model);
-          hint.textContent = '';
-        } else {
-          fillModels();
-          hint.textContent = 'Add at least one API key to .env and restart.';
-        }
-      } catch (e) {
-        hint.textContent = 'Could not load models.';
-      }
-    }
+<script>
+const $ = id => document.getElementById(id);
 
-    function fillModels(selected) {
-      const id = document.getElementById('providerSelector').value;
-      const sel = document.getElementById('modelSelector');
-      const p = providers.find(x => x.id === id);
-      sel.innerHTML = '';
-      for (const m of (p ? p.models : [])) sel.add(new Option(m.label, m.id));
-      if (selected) sel.value = selected;
-    }
+let providers = [];
+let currentVideoId = null;
+let startTime = 0;
 
-    function extractVideoId(url) {
-      const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/))([\w-]{11})/);
-      return m ? m[1] : null;
-    }
+// ── Extract video ID ──
+function extractVideoId(input) {
+  input = input.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+  try {
+    const url = new URL(input);
+    if (url.hostname.includes('youtu.be')) return url.pathname.slice(1).split('/')[0];
+    return url.searchParams.get('v') || null;
+  } catch { return null; }
+}
 
-    // Show thumbnail as user types
-    document.getElementById('youtubeUrl').addEventListener('input', function () {
-      const vid = extractVideoId(this.value);
-      const thumb = document.getElementById('thumbnail');
-      if (vid) {
-        document.getElementById('thumbImg').src = `https://img.youtube.com/vi/${vid}/mqdefault.jpg`;
-        thumb.style.display = 'block';
-      } else {
-        thumb.style.display = 'none';
-      }
+// ── Thumbnail ──
+function showThumb(vid) {
+  if (vid) {
+    $('thumbImg').src = `https://img.youtube.com/vi/${vid}/hqdefault.jpg`;
+    $('thumbImg').style.display = 'block';
+    $('thumbPlaceholder').style.display = 'none';
+  } else {
+    $('thumbImg').style.display = 'none';
+    $('thumbPlaceholder').style.display = 'block';
+  }
+}
+
+// ── URL input ──
+$('videoUrl').addEventListener('input', () => {
+  currentVideoId = extractVideoId($('videoUrl').value);
+  showThumb(currentVideoId);
+  $('summarizeBtn').disabled = !currentVideoId;
+});
+
+// ── Load models ──
+async function loadModels() {
+  try {
+    const res = await fetch('/api/models');
+    const data = await res.json();
+    providers = data.providers || [];
+    const ps = $('providerSelect');
+    ps.innerHTML = '';
+    providers.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.label + (p.available ? '' : ' (no key)');
+      opt.disabled = !p.available;
+      ps.appendChild(opt);
     });
+    if (data.default) ps.value = data.default.provider;
+    ps.disabled = false;
+    updateModels();
+    if (data.default) $('modelSelect').value = data.default.model;
+  } catch(e) {
+    console.error('Failed to load models', e);
+  }
+}
 
-    async function sendUrl() {
-      const url = document.getElementById('youtubeUrl').value;
-      const provider = document.getElementById('providerSelector').value;
-      const model = document.getElementById('modelSelector').value;
-      const videoId = extractVideoId(url);
-
-      const btn = document.getElementById('summarizeBtn');
-      const loader = document.getElementById('loader');
-      const section = document.getElementById('outputSection');
-      const output = document.getElementById('output');
-      const meta = document.getElementById('meta');
-
-      if (!videoId) {
-        section.classList.add('visible');
-        output.textContent = 'Paste a valid YouTube link above.';
-        output.className = 'output-body error';
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Summarizing...';
-      loader.classList.add('active');
-      document.getElementById('loaderModel').textContent =
-        document.getElementById('modelSelector').selectedOptions[0]?.text || model;
-      section.classList.remove('visible');
-
-      const start = Date.now();
-      try {
-        const res = await fetch('/summarize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ video_id: videoId, provider, model }),
-        });
-        const data = await res.json();
-        const seconds = ((Date.now() - start) / 1000).toFixed(1);
-
-        section.classList.add('visible');
-        if (!res.ok || data.error) {
-          output.textContent = data.error || 'Something went wrong.';
-          output.className = 'output-body error';
-          meta.textContent = '';
-        } else {
-          const note = data.truncated ? 'Note: this video is long, so the summary covers only the first part.\n\n' : '';
-          output.textContent = note + (data.summary || 'No summary received.');
-          output.className = 'output-body';
-          const providerLabel = providers.find(p => p.id === data.provider)?.label || data.provider;
-          meta.textContent = `${providerLabel} · ${data.model} · ${seconds}s`;
-        }
-      } catch (e) {
-        section.classList.add('visible');
-        output.textContent = 'Network error. Check your connection and try again.';
-        output.className = 'output-body error';
-        meta.textContent = '';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Summarize';
-        loader.classList.remove('active');
-      }
-    }
-
-    function copySummary() {
-      const text = document.getElementById('output').textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = document.querySelector('.copy-btn');
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 1500);
-      });
-    }
-
-    // Enter key triggers summarize
-    document.getElementById('youtubeUrl').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') sendUrl();
+function updateModels() {
+  const pid = $('providerSelect').value;
+  const prov = providers.find(p => p.id === pid);
+  const ms = $('modelSelect');
+  ms.innerHTML = '';
+  if (prov && prov.models) {
+    prov.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.label;
+      ms.appendChild(opt);
     });
+  }
+  ms.disabled = false;
+}
+$('providerSelect').addEventListener('change', updateModels);
 
-    loadModels();
-  </script>
+// ── Progress simulation ──
+let progressInterval = null;
+function startProgress() {
+  const steps = [
+    { pct: 15, text: 'Fetching transcript...', ms: 500 },
+    { pct: 35, text: 'Transcript received, sending to AI...', ms: 2000 },
+    { pct: 55, text: 'AI is reading the content...', ms: 5000 },
+    { pct: 70, text: 'Generating summary...', ms: 9000 },
+    { pct: 85, text: 'Almost done...', ms: 15000 },
+    { pct: 92, text: 'Polishing the output...', ms: 25000 },
+  ];
+  let step = 0;
+  $('progressWrap').classList.add('active');
+  $('progressFill').style.width = '5%';
+  $('progressPct').textContent = '5%';
+  $('progressText').textContent = 'Starting...';
+
+  progressInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    if (step < steps.length && elapsed >= steps[step].ms) {
+      $('progressFill').style.width = steps[step].pct + '%';
+      $('progressPct').textContent = steps[step].pct + '%';
+      $('progressText').textContent = steps[step].text;
+      step++;
+    }
+  }, 300);
+}
+function stopProgress(success) {
+  clearInterval(progressInterval);
+  $('progressFill').style.width = '100%';
+  $('progressPct').textContent = '100%';
+  $('progressText').textContent = success ? 'Done!' : 'Failed';
+  setTimeout(() => $('progressWrap').classList.remove('active'), 2000);
+}
+
+// ── Summarize ──
+$('summarizeBtn').addEventListener('click', async () => {
+  if (!currentVideoId) return;
+  const btn = $('summarizeBtn');
+  btn.disabled = true;
+  btn.textContent = 'Summarizing...';
+  $('summaryBox').className = 'summary-content empty';
+  $('summaryBox').textContent = 'Working on it...';
+  $('copyBtn').style.display = 'none';
+  $('metaRow').style.display = 'none';
+  startTime = Date.now();
+  startProgress();
+
+  try {
+    const res = await fetch('/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        video_id: currentVideoId,
+        provider: $('providerSelect').value,
+        model: $('modelSelect').value,
+      }),
+    });
+    const data = await res.json();
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    if (data.error) {
+      $('summaryBox').className = 'summary-content error';
+      $('summaryBox').textContent = data.error;
+      stopProgress(false);
+    } else {
+      $('summaryBox').className = 'summary-content';
+      $('summaryBox').innerHTML = formatSummary(data.summary);
+      $('copyBtn').style.display = 'block';
+      $('metaRow').style.display = 'flex';
+      $('metaProvider').textContent = (data.provider || '') + ' / ' + (data.model || '');
+      $('metaTime').textContent = elapsed + 's';
+      stopProgress(true);
+    }
+  } catch (err) {
+    $('summaryBox').className = 'summary-content error';
+    $('summaryBox').textContent = 'Network error: ' + err.message;
+    stopProgress(false);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Summarize';
+});
+
+// ── Format markdown-ish summary ──
+function formatSummary(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\s*[-•]\s+(.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+    .replace(/\n{2,}/g, '</p><p>')
+    .replace(/\n/g, '<br>')
+    .replace(/^/, '<p>').replace(/$/, '</p>');
+}
+
+// ── Copy ──
+$('copyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText($('summaryBox').innerText).then(() => {
+    $('copyBtn').textContent = 'Copied!';
+    setTimeout(() => $('copyBtn').textContent = 'Copy', 1500);
+  });
+});
+
+// ── Init ──
+loadModels();
+</script>
 </body>
-
 </html>
