@@ -1,19 +1,78 @@
-"""Transcript extraction: yt-dlp subtitles first, Groq Whisper audio fallback.
+"""Transcript extraction, in three steps. The first one that works wins.
 
-Path 1 (95% of videos): yt-dlp fetches auto/manual subtitles -> parse VTT -> clean text
-Path 2 (fallback):       yt-dlp downloads audio only -> Groq Whisper transcribes -> text
+Step 1: transcript API (Supadata). YouTube refuses requests from cloud server IPs,
+        so on a host like Render this is the step that normally succeeds.
+Step 2: yt-dlp fetches the subtitle file directly (works locally or behind a residential proxy).
+Step 3: yt-dlp downloads the audio and Groq Whisper transcribes it.
+
+Transcripts are cached in memory, so a video is only fetched once per server run.
 """
+import json
 import logging
 import os
 import re
 import subprocess
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+from collections import OrderedDict
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "/app/cookies.txt")
-PROXY_URL = os.getenv("YT_PROXY_URL", "").strip()  # e.g. socks5://user:pass@host:port or http://user:pass@host:port
+PROXY_URL = os.getenv("YT_PROXY_URL", "").strip()  # http://user:pass@host:port, residential proxies only
+SUPADATA_BASE_URL = os.getenv("SUPADATA_BASE_URL", "https://api.supadata.ai/v1").rstrip("/")
+
+CACHE_SIZE = 200
+_cache: "OrderedDict[str, tuple[str, str]]" = OrderedDict()
+
+
+def _proxy_host() -> str:
+    """The proxy's host and port for logging, without the username and password."""
+    return PROXY_URL.rsplit("@", 1)[-1]
+
+
+def _fetch_via_api(video_id: str) -> str | None:
+    """Ask the Supadata transcript API for the video's existing captions."""
+    api_key = os.getenv("SUPADATA_API_KEY", "").strip()
+    if not api_key:
+        logger.info("SUPADATA_API_KEY not set, skipping the transcript API")
+        return None
+
+    query = urllib.parse.urlencode({
+        "url": f"https://www.youtube.com/watch?v={video_id}",
+        "text": "true",
+        "mode": "native",
+    })
+    request = urllib.request.Request(
+        f"{SUPADATA_BASE_URL}/transcript?{query}",
+        headers={"x-api-key": api_key, "Accept": "application/json", "User-Agent": "yt-summarizer/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            status = response.status
+            data = json.loads(response.read().decode("utf-8", errors="ignore"))
+    except urllib.error.HTTPError as error:
+        body = error.read().decode("utf-8", errors="ignore")[:300]
+        logger.warning("Transcript API returned HTTP %d for %s: %s", error.code, video_id, body)
+        return None
+    except Exception as error:
+        logger.warning("Transcript API request failed for %s: %s", video_id, error)
+        return None
+
+    content = data.get("content") if isinstance(data, dict) else None
+    if isinstance(content, list):
+        content = " ".join(str(chunk.get("text", "")) for chunk in content if isinstance(chunk, dict))
+    if status != 200 or not isinstance(content, str) or len(content.strip()) < 50:
+        logger.info("Transcript API had no usable transcript for %s (HTTP %d)", video_id, status)
+        return None
+
+    transcript = " ".join(content.split())
+    logger.info("Got transcript from the API for %s: %d chars", video_id, len(transcript))
+    return transcript
+
 
 
 def _cookies_file() -> str | None:
@@ -68,14 +127,14 @@ def _fetch_subtitles(video_id: str) -> str | None:
             "--sub-format", "vtt",
             "--output", os.path.join(tmp_dir, "video"),
             "--no-warnings",
-            "--verbose",
+            "--ignore-no-formats-error",
         ]
         cookies = _cookies_file()
         if cookies:
             cmd += ["--cookies", cookies]
         if PROXY_URL:
             cmd += ["--proxy", PROXY_URL]
-            logger.info("Using proxy: %s", PROXY_URL[:30] + "...")
+            logger.info("Using proxy %s", _proxy_host())
         cmd.append(url)
 
         logger.info("Running yt-dlp subtitle cmd: %s", " ".join(cmd[:8]) + " ...")
@@ -176,16 +235,20 @@ def _fetch_audio_transcript(video_id: str) -> str | None:
 
 
 def get_transcript(video_id: str) -> tuple[str | None, str]:
-    """Get transcript for a video. Returns (text, method)."""
+    """Get a video's transcript. Returns (text, method): method is 'api', 'subtitles', 'whisper' or 'failed'."""
+    if video_id in _cache:
+        _cache.move_to_end(video_id)
+        logger.info("Transcript for %s served from cache", video_id)
+        return _cache[video_id]
+
     logger.info("=== Fetching transcript for %s ===", video_id)
-
-    text = _fetch_subtitles(video_id)
-    if text:
-        return text, "subtitles"
-
-    logger.info("No subtitles, trying Whisper fallback for %s", video_id)
-    text = _fetch_audio_transcript(video_id)
-    if text:
-        return text, "whisper"
+    for method, fetch in (("api", _fetch_via_api), ("subtitles", _fetch_subtitles), ("whisper", _fetch_audio_transcript)):
+        text = fetch(video_id)
+        if text:
+            _cache[video_id] = (text, method)
+            if len(_cache) > CACHE_SIZE:
+                _cache.popitem(last=False)
+            return text, method
+        logger.info("Step '%s' gave no transcript for %s", method, video_id)
 
     return None, "failed"
