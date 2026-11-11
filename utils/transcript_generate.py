@@ -13,6 +13,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH", "/app/cookies.txt")
+PROXY_URL = os.getenv("YT_PROXY_URL", "").strip()  # e.g. socks5://user:pass@host:port or http://user:pass@host:port
 
 
 def _cookies_file() -> str | None:
@@ -72,6 +73,9 @@ def _fetch_subtitles(video_id: str) -> str | None:
         cookies = _cookies_file()
         if cookies:
             cmd += ["--cookies", cookies]
+        if PROXY_URL:
+            cmd += ["--proxy", PROXY_URL]
+            logger.info("Using proxy: %s", PROXY_URL[:30] + "...")
         cmd.append(url)
 
         logger.info("Running yt-dlp subtitle cmd: %s", " ".join(cmd[:8]) + " ...")
@@ -124,6 +128,8 @@ def _fetch_audio_transcript(video_id: str) -> str | None:
         cookies = _cookies_file()
         if cookies:
             cmd += ["--cookies", cookies]
+        if PROXY_URL:
+            cmd += ["--proxy", PROXY_URL]
         cmd.append(url)
 
         logger.info("Running yt-dlp audio cmd for %s", video_id)
